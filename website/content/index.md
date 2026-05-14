@@ -13,8 +13,8 @@ show_table_of_contents: false
     (how it's built) refines that surface.
   </p>
   <div class="cta">
-    <a class="btn btn-primary" href="overview.html">Start with the overview</a>
-    <a class="btn btn-secondary" href="language-spec.html">Read the spec</a>
+    <a class="btn btn-primary" href="tutorial.html">15-minute tutorial</a>
+    <a class="btn btn-secondary" href="overview.html">Read the overview</a>
     <a class="btn btn-secondary" href="surfacide.html">Get the toolchain</a>
   </div>
 </section>
