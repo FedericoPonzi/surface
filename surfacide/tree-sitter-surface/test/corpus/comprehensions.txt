@@ -1,0 +1,60 @@
+==================
+Tuple-destructure map comprehension
+==================
+
+module Test
+
+surface {
+  init {
+    follows := { (a, b) -> false | (a, b) in USERS cross USERS }
+  }
+}
+
+---
+
+(source_file
+  (module_header
+    name: (qualified_name (identifier)))
+  (surface_block
+    (init_block
+      (assign_effect
+        target: (identifier)
+        value: (comprehension
+          (comp_map_arrow
+            (tuple_expr
+              (identifier_expr (identifier))
+              (identifier_expr (identifier)))
+            (bool_lit))
+          (comp_binder
+            name: (tuple_pattern (identifier) (identifier))
+            source: (binary_expr
+              (identifier_expr (identifier))
+              (identifier_expr (identifier)))))))))
+
+==================
+Map literal with tuple keys
+==================
+
+module Test
+
+surface {
+  init {
+    g := { (D1, P1) -> "x" }
+  }
+}
+
+---
+
+(source_file
+  (module_header
+    name: (qualified_name (identifier)))
+  (surface_block
+    (init_block
+      (assign_effect
+        target: (identifier)
+        value: (map_literal
+          (map_literal_entry
+            key: (tuple_expr
+              (identifier_expr (identifier))
+              (identifier_expr (identifier)))
+            value: (string)))))))

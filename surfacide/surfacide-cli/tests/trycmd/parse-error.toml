@@ -1,0 +1,9 @@
+bin.name = "surfacide"
+args = ["parse", "tests/trycmd/fixtures/parse_error.surf"]
+# The contract: parsing this file exits non-zero. The exact diagnostic
+# wording is tested at the unit level in `surfacide-diag::render`;
+# locking the full miette frame here would make the test brittle to
+# minor message changes. We only check that the binary refuses the
+# input.
+status.code = 1
+

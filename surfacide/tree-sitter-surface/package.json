@@ -1,0 +1,43 @@
+{
+  "name": "tree-sitter-surface",
+  "version": "0.10.1",
+  "description": "Tree-sitter grammar for the Surface specification language (v0.10.1)",
+  "main": "bindings/node",
+  "types": "bindings/node",
+  "scripts": {
+    "generate": "tree-sitter generate",
+    "test": "tree-sitter test",
+    "install": "node-gyp-build",
+    "prebuildify": "prebuildify --napi --strip"
+  },
+  "tree-sitter": [
+    {
+      "scope": "source.surface",
+      "file-types": [
+        "surf"
+      ]
+    }
+  ],
+  "dependencies": {
+    "node-gyp-build": "^4.8.0"
+  },
+  "peerDependencies": {
+    "tree-sitter": "^0.21.0"
+  },
+  "peerDependenciesMeta": {
+    "tree_sitter": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "prebuildify": "^6.0.0"
+  },
+  "files": [
+    "grammar.js",
+    "binding.gyp",
+    "prebuilds/**",
+    "bindings/node/*",
+    "queries/*",
+    "src/**"
+  ]
+}

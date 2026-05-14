@@ -1,0 +1,11 @@
+bin.name = "surfacide"
+args = ["check", "tests/trycmd/fixtures/tiny.surf"]
+status.code = 0
+
+stdout = ""
+
+stderr = """
+surfacide: 1 file(s) checked, no diagnostics
+"""
+
+

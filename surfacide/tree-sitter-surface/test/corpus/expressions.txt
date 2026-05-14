@@ -1,0 +1,92 @@
+==================
+Let-in expression in history_predicate body
+==================
+
+module Test
+
+history_predicate p(e: Event) {
+  let snap := state_at(e)
+  in dist in snap.x
+}
+
+---
+
+(source_file
+  (module_header
+    name: (qualified_name (identifier)))
+  (history_predicate_decl
+    name: (identifier)
+    (param_list
+      (param
+        name: (identifier)
+        type: (type_expr (simple_type (identifier)))))
+    body: (let_expr
+      name: (identifier)
+      value: (call_expr
+        callee: (identifier_expr (identifier))
+        (call_args
+          (call_arg (identifier_expr (identifier)))))
+      body: (binary_expr
+        (identifier_expr (identifier))
+        (field_access
+          object: (identifier_expr (identifier))
+          (dotted_field))))))
+
+==================
+Empty else with branch label
+==================
+
+module Test
+
+surface {
+  action foo()
+    then if x then [a]
+           y := 1
+         else [noop]
+}
+
+---
+
+(source_file
+  (module_header
+    name: (qualified_name (identifier)))
+  (surface_block
+    (action_decl
+      name: (identifier)
+      (param_list)
+      (then_block
+        (if_effect
+          guard: (identifier_expr (identifier))
+          then_label: (branch_label name: (identifier))
+          (assign_effect
+            target: (identifier)
+            value: (number))
+          (else_clause
+            else_label: (branch_label name: (identifier))))))))
+
+==================
+Multi-channel auth_channel set form
+==================
+
+module Test
+
+surface {
+  action foo()
+    auth_channel : { anonymous, signed_request, bearer_token }
+}
+
+---
+
+(source_file
+  (module_header
+    name: (qualified_name (identifier)))
+  (surface_block
+    (action_decl
+      name: (identifier)
+      (param_list)
+      (slot_assign
+        value: (slot_value
+          (slot_set
+            channel: (identifier)
+            channel: (identifier)
+            channel: (identifier)))))))

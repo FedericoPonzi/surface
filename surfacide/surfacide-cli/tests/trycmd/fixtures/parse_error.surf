@@ -1,0 +1,5 @@
+module Bad
+
+actor User
+
+@@@ totally bogus

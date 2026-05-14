@@ -1,0 +1,10 @@
+bin.name = "surfacide"
+args = ["parse", "tests/trycmd/fixtures/tiny.surf"]
+status.code = 0
+
+stdout = """
+tests/trycmd/fixtures/tiny.surf: parsed OK (module `Tiny`, 1 decl(s))
+"""
+
+
+

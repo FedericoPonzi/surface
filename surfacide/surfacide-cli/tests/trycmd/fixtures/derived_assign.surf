@@ -1,0 +1,25 @@
+module DerivedAssign
+
+actor User
+event Done()
+
+surface {
+  state {
+    plain : Nat
+    aggregated : Set[Nat]  derived  shape: aggregate
+  }
+  init { plain := 0 }
+
+  action go()
+    by u: User
+    idempotency   : idempotent
+    auth_channel  : anonymous
+    retention     : ephemeral
+    rate_limit    : unlimited
+    observability : silent
+    availability  : best_effort
+    freshness     : not_applicable
+    then  plain := plain + 1
+          aggregated := aggregated union {plain}   -- E_DERIVED_ASSIGN
+          emit Done()
+}

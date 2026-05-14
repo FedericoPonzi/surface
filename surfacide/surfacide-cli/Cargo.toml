@@ -1,0 +1,26 @@
+[package]
+name = "surfacide-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The `surfacide` CLI binary."
+
+[[bin]]
+name = "surfacide"
+path = "src/main.rs"
+
+[dependencies]
+surfacide-ast.workspace = true
+surfacide-diag.workspace = true
+surfacide-syntax.workspace = true
+surfacide-resolve.workspace = true
+surfacide-check.workspace = true
+surfacide-obligations.workspace = true
+surfacide-docs.workspace = true
+clap.workspace = true
+miette.workspace = true
+anyhow.workspace = true
+camino.workspace = true
+
+[dev-dependencies]
+trycmd.workspace = true

@@ -1,0 +1,3 @@
+bin.name = "surfacide"
+args = ["emit", "docs", "tests/trycmd/fixtures/tiny.surf", "-o", "/tmp/surfacide-trycmd-docs"]
+status.code = 0

@@ -1,0 +1,7 @@
+target/
+**/*.rs.bk
+Cargo.lock.bak
+tree-sitter-surface/node_modules/
+tree-sitter-surface/build/
+.DS_Store
+out/

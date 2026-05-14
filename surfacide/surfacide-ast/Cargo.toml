@@ -1,0 +1,17 @@
+[package]
+name = "surfacide-ast"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Surface language AST types with source spans and provenance."
+
+[dependencies]
+indexmap.workspace = true
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+pretty_assertions.workspace = true
+
+[features]
+default = []
+serde = ["dep:serde", "indexmap/serde"]

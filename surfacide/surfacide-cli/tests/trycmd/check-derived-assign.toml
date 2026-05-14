@@ -1,0 +1,3 @@
+bin.name = "surfacide"
+args = ["check", "tests/trycmd/fixtures/derived_assign.surf"]
+status.code = 1

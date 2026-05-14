@@ -1,0 +1,15 @@
+[package]
+name = "surfacide-docs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Markdown projection (boundary checklist) for Surface."
+
+[dependencies]
+surfacide-ast.workspace = true
+surfacide-resolve.workspace = true
+surfacide-check.workspace = true
+anyhow.workspace = true
+
+[dev-dependencies]
+pretty_assertions.workspace = true

@@ -1,0 +1,6 @@
+bin.name = "surfacide"
+args = ["check", "tests/trycmd/fixtures/slot_missing.surf"]
+# Contract: the slotless action produces exactly 7 missing-slot errors
+# and exits non-zero. Exact diagnostic wording is unit-tested in
+# surfacide-check; here we only assert the contract.
+status.code = 1

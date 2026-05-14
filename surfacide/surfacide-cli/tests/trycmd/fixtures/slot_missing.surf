@@ -1,0 +1,15 @@
+module SlotMissing
+
+actor User
+event Done()
+
+surface {
+  state { x : Nat }
+  init { x := 0 }
+
+  action go()
+    by u: User
+    -- All seven slots missing — each should fire E_SURFACE_SLOT_MISSING.
+    then  x += 1
+          emit Done()
+}

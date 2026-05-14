@@ -1,0 +1,50 @@
+[workspace]
+resolver = "2"
+members = [
+    "surfacide-ast",
+    "surfacide-diag",
+    "surfacide-syntax",
+    "surfacide-resolve",
+    "surfacide-check",
+    "surfacide-obligations",
+    "surfacide-docs",
+    "surfacide-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Surface contributors"]
+repository = "https://github.com/.../surface"
+rust-version = "1.75"
+
+[workspace.dependencies]
+# Internal
+surfacide-ast = { path = "surfacide-ast" }
+surfacide-diag = { path = "surfacide-diag" }
+surfacide-syntax = { path = "surfacide-syntax" }
+surfacide-resolve = { path = "surfacide-resolve" }
+surfacide-check = { path = "surfacide-check" }
+surfacide-obligations = { path = "surfacide-obligations" }
+surfacide-docs = { path = "surfacide-docs" }
+
+# Third-party
+tree-sitter = "0.22"
+miette = { version = "7", features = ["fancy"] }
+thiserror = "1"
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+indexmap = "2"
+camino = "1"
+
+# Test-only
+insta = { version = "1", features = ["yaml"] }
+trycmd = "0.15"
+pretty_assertions = "1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

@@ -1,0 +1,16 @@
+[package]
+name = "surfacide-obligations"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Static-obligation derivation pass for Surface (§15)."
+
+[dependencies]
+surfacide-ast.workspace = true
+surfacide-diag.workspace = true
+surfacide-resolve.workspace = true
+surfacide-check.workspace = true
+indexmap.workspace = true
+
+[dev-dependencies]
+pretty_assertions.workspace = true
