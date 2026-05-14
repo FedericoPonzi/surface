@@ -1,0 +1,14 @@
+# Genereto configuration for the Surface language website.
+
+template: 'surface'
+output_dirname: 'output'
+
+title: 'Surface — a refinement-based spec language'
+description: 'Surface: specify systems by what users experience and verify any chosen substrate refines that surface. Experimental v0.10.1.'
+url: 'https://example.invalid/surface'  # set to the GitHub Pages URL when deploying
+
+blog:
+    base_template: blog.html
+    index_name: blog-index.html  # we don't link to this; landing is content/index.md
+    destination: ""              # render doc pages flat at output/*.html
+    generate_single_pages: true

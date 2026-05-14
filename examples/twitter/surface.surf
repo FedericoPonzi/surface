@@ -1,0 +1,285 @@
+module Twitter
+
+"""
+Twitter — surface specification (v0.10 end-to-end demo).
+
+A small social network: users post short messages, follow/unfollow each
+other, mark themselves protected (private), and fetch individual posts.
+Visibility rules are enforced at fetch time, not at post time.
+
+This file is the public contract. The implementation lives in two
+peer substrates (`PostStore` and `FollowGraph`) joined by a `compose`;
+see `data.surf`, `graph.surf`, and `compose.surf`.
+
+**v0.10 update.** Three structural changes from the v0.9 version:
+
+1. `posts` is now `derived from aggregate UserAccount[u].my_posts using
+   union_set` (§6.6). The surface never assigns to it; the substrate's
+   per-user storage is the single source of truth. (P1-V9-4 / R5-R7
+   carry-forward, finally closed.)
+2. `defaults { … }` block trims the slot ceremony — auth_channel,
+   retention, rate_limit, availability, freshness are inherited; each
+   action overrides only what's different. (P1-V9-1.)
+3. `follows` and `protected` carry the `private` modifier (§6.5),
+   making the "read only through actor-relative observables" convention
+   compiler-enforceable as a warning.
+"""
+
+actor User
+
+type Content = String
+-- Post id is a (author, sequence) pair so two distinct authors can't
+-- mint a colliding "p0".
+type PostId = (User, Nat)
+
+extern USERS  : Set[User]
+-- The protected user the attacker tries to leak. Set in the .cfg at
+-- check time. Declared at module level so the attacker block can
+-- reference it (extern is a top-level form per §2 of the spec).
+extern TARGET : User
+
+-- Duration consts used by the v0.9 retention and rate_limit slots.
+const SECOND : Duration
+const MINUTE : Duration
+const DAY    : Duration
+const YEAR   : Duration
+
+
+-- ── Events ─────────────────────────────────────────────────────────────
+
+"""A post was published."""
+event Posted(id: PostId, author: User, content: Content)
+
+"""Two follow events bracket each follow relationship over time."""
+event Followed(follower: User, target: User)
+event Unfollowed(follower: User, target: User)
+
+"""Visibility setting was changed."""
+event ProtectionChanged(u: User, protected: Bool)
+
+"""A user successfully fetched a post they were allowed to see."""
+event Disclosed(post: PostId, content: Content, author: User, to: User)
+
+"""A user was denied a fetch (post is from a protected non-follower).
+   The recipient field is `to`, matching the v0.7 §5.1.2 resolution
+   rule for `observed ... by X` assertions."""
+event FetchDenied(post: PostId, to: User, reason: String)
+
+
+-- ── History predicates (top-level per §2 / §9.1) ──────────────────────
+
+-- v0.7: history predicates use `state_at(e)` (§9.1.2). v0.9: predicates
+-- still read `follows`/`protected` directly because state_at returns a
+-- snapshot record of *all* surface state fields, including the
+-- backing storage for actor-relative observables. The user-facing
+-- surface is the observables; the snapshot is for time-relative
+-- predicates only.
+history_predicate is_following_at(viewer: User, target: User, e: Event) {
+  state_at(e).follows[(viewer, target)]
+}
+
+history_predicate is_protected_at(target: User, e: Event) {
+  state_at(e).protected[target]
+}
+
+
+surface {
+
+  defaults {
+    auth_channel  : session
+    retention     : transactional
+    rate_limit    : per_actor(1000, per=DAY)
+    availability  : best_effort
+    freshness     : eventual
+  }
+
+  state {
+    -- v0.10: `posts` is DERIVED. The projection itself lives in the
+    -- substrate's maps { posts = aggregate UserAccount[u].my_posts
+    -- using union_set else {} } — the surface only declares that
+    -- the field is derived and what shape its projection takes.
+    -- (P1-V9-4 / R5+R6+R7 carry-forward, finally closed. The
+    -- abstraction-preserving form per the v0.10 PL review.)
+    posts     : Set[{id: PostId, author: User, content: Content}]
+                derived
+                shape: aggregate
+
+    -- Plain state, written by surface actions:
+    follows   : Map[(User, User) -> Bool]              private
+    protected : Map[User -> Bool]                       private
+    next_seq  : Map[User -> Nat]
+  }
+
+  init {
+    -- `posts` is derived — initial value is determined by the substrate's
+    -- initial state; an `init` assignment here would be E_DERIVED_ASSIGN.
+    follows   := { (a, b) -> false | (a, b) in USERS cross USERS }
+    protected := { u -> false | u in USERS }
+    next_seq  := { u -> 0 | u in USERS }
+  }
+
+  fairness weak fetch_post
+
+  -- ── Actor-relative observables (v0.9, §5.3) ──────────────────────────
+
+  """The set of users `u` follows. Each user sees only their own
+     outgoing edges."""
+  observable for u: User following() : Set[User] =
+    { v in USERS | follows[(u, v)] }
+
+  """Whether `u` themselves is currently set as protected. Other users
+     learn this only indirectly (through fetch denials)."""
+  observable for u: User i_am_protected() : Bool =
+    protected[u]
+
+  """The set of posts `u` is allowed to see right now. This is what
+     `u` actually observes — there is no globally-visible 'posts'
+     surface; the visibility rule is part of the surface itself.
+
+     Notes: references `posts` (a derived field) and the `private`
+     follows/protected backing storage. The body is pure; the
+     substrate's projection of `posts` is materialised before any
+     read here."""
+  observable for u: User visible_posts() : Set[{id: PostId, author: User, content: Content}] =
+    { p in posts | p.author == u
+                || follows[(u, p.author)]
+                || not protected[p.author] }
+
+  """Whether `u` can see this specific post. Equivalent to membership
+     in `visible_posts()` but cheaper to read for guards."""
+  observable for u: User can_see(pid: PostId) : Bool =
+    exists p in posts. p.id == pid
+                     && (p.author == u
+                         || follows[(u, p.author)]
+                         || not protected[p.author])
+
+
+  -- ── Properties ───────────────────────────────────────────────────────
+
+  """Every Disclosed event refers to a post that was previously published."""
+  property no_fabrication {
+    always (forall e in events.
+              e is Disclosed =>
+                exists p in events_before(e).
+                  p is Posted && p.id == e.post && p.author == e.author)
+  }
+
+  """Every Disclosed event was, at the time it fired, to a viewer with
+     authorization to see the post. Uses v0.7 `state_at(e)` (§9.1.2)
+     so the check is genuinely time-relative — toggling a protection
+     flag now does not retroactively turn old disclosures into
+     violations."""
+  property no_unauthorized_disclosure {
+    always (forall e in events.
+              e is Disclosed =>
+                e.author == e.to
+                || is_following_at(e.to, e.author, e)
+                || not is_protected_at(e.author, e))
+  }
+
+
+  -- ── Actions ──────────────────────────────────────────────────────────
+
+  """Publish a post. The id is `(u, next_seq[u])` so collisions across
+     authors are impossible. Return value is the freshly minted PostId.
+
+     v0.10: `posts` is derived — we DO NOT assign to it here. The
+     substrate's UserAccount[u].publish action adds the post to that
+     user's storage, and the derived projection picks it up
+     automatically. The surface action's only state effect is
+     incrementing next_seq."""
+  action post(content: Content) -> PostId
+    by    u: User
+    idempotency   : at_most_once
+    -- auth_channel, retention.... mostly from defaults; override retention
+    retention     : audit(period=YEAR)
+    rate_limit    : per_actor(300, per=MINUTE)
+    observability : broadcast(Posted)
+    availability  : critical
+    freshness     : not_applicable    -- write action, no consistency-of-read story
+    then  let id := (u, next_seq[u])
+          next_seq[u]    += 1
+          emit Posted(id=id, author=u, content=content)
+          return id
+
+  """Follow another user. Uses labeled branches so the substrate can
+     target the new-follow path with a real action and the redundant
+     branch with a substrate stutter step."""
+  action follow(target: User)
+    by    u: User
+    raises { CantFollowSelf when target == u }
+    idempotency   : idempotent by(target)
+    -- auth_channel, retention, rate_limit, availability, freshness from defaults
+    observability : target(target, Followed)
+    then  if not follows[(u, target)] then [new]
+            follows[(u, target)] := true
+            emit Followed(follower=u, target=target)
+          else [redundant]
+            -- already following: no observable change.
+
+  action unfollow(target: User)
+    by    u: User
+    idempotency   : idempotent by(target)
+    observability : target(target, Unfollowed)
+    then  if follows[(u, target)] then [drop]
+            follows[(u, target)] := false
+            emit Unfollowed(follower=u, target=target)
+          else [noop]
+
+  """Toggle protection. Labeled branches: only on real changes is an
+     event emitted."""
+  action set_protected(p: Bool)
+    by    u: User
+    idempotency   : idempotent by(p)
+    rate_limit    : per_actor(10, per=MINUTE)
+    observability : caller_only(ProtectionChanged)
+    then  if protected[u] != p then [change]
+            protected[u] := p
+            emit ProtectionChanged(u=u, protected=p)
+          else [noop]
+
+  """Fetch one specific post, returning its content if the requester is
+     allowed to see it. Visibility is decided by the `can_see(pid)`
+     actor-relative observable, which is bound to the calling `u`
+     automatically (§5.3 rule 1).
+
+     Labeled branches let the data-plane substrate realize the success
+     branch and the deny branch with two distinct concrete actions; the
+     compose-level realizes adds the cross-substrate guard that decides
+     between them."""
+  action fetch_post(pid: PostId) -> Optional[Content]
+    by    u: User
+    raises { NotFound when not (exists p in posts. p.id == pid) }
+    idempotency   : idempotent
+    retention     : ephemeral
+    rate_limit    : per_actor(2000, per=MINUTE)
+    observability : caller_only(Disclosed, FetchDenied)
+    availability  : critical
+    -- freshness inherited (eventual): a tweet a friend just posted may
+    -- not be visible for a few epochs while UserAccount fanout propagates.
+    then  let post := choose p in posts. p.id == pid
+          if can_see(pid) then [allow]
+            emit Disclosed(post=pid, content=post.content,
+                           author=post.author, to=u)
+            return Some(post.content)
+          else [deny]
+            emit FetchDenied(post=pid, to=u,
+                             reason="protected, not follower")
+            return None
+}
+
+
+-- ── Attacker ──────────────────────────────────────────────────────────
+
+"""A user who is NOT following a protected target attempts to obtain
+   a Disclosed event for one of that target's posts. The integrity
+   check asks: does any chain of allowed actions lead to this?"""
+attacker NonFollowerSnoop {
+  controls   snoop : User
+  initial    protected[TARGET] == true
+             && not follows[(snoop, TARGET)]
+             && snoop != TARGET
+  may        any action allowed for snoop
+  goal       eventually emits Disclosed(post=_, content=_,
+                                        author=TARGET, to=snoop)
+}

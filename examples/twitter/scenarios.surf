@@ -1,0 +1,68 @@
+module Twitter
+
+"""
+Scenarios for the Twitter end-to-end demo. Three normal scenarios
+(safety / safety / liveness) plus the attacker block lives in
+surface.surf.
+
+The scenarios assume `Production` (the compose) as the realising
+substrate for everything liveness-flavoured.
+
+Note on `kind:` — per §8 of the spec, `forbidden` means the trace
+cannot reach the `then` state. Asserting that an action *fails with*
+a named error is a positive assertion about a reachable state of the
+failure path, so the correct kind is `safety`.
+"""
+
+
+scenario "follow then fetch sees the post" kind: safety {
+  actors { A: User, B: User }
+  given  posts == {}
+         follows == { (a, b) -> false | (a, b) in USERS cross USERS }
+         protected == { u -> false | u in USERS }
+         next_seq == { u -> 0 | u in USERS }
+  when   B does follow(A)
+         A does post("hello")
+         B does fetch_post((A, 0))
+  then   observed Disclosed(post=(A, 0), content="hello",
+                            author=A, to=B) by B
+}
+
+
+scenario "cannot follow yourself raises CantFollowSelf" kind: safety {
+  actors { A: User }
+  given  posts == {}
+         follows == { (a, b) -> false | (a, b) in USERS cross USERS }
+         protected == { u -> false | u in USERS }
+         next_seq == { u -> 0 | u in USERS }
+  when   A does follow(A)
+  then   fails with CantFollowSelf
+}
+
+
+scenario "non-follower fetching a protected post is denied" kind: safety {
+  actors { A: User, B: User }
+  given  posts == { {id: (A, 0), author: A, content: "secret"} }
+         follows == { (a, b) -> false | (a, b) in USERS cross USERS }
+         protected == { u -> u == A }
+         next_seq == { u -> if u == A then 1 else 0 | u in USERS }
+  when   B does fetch_post((A, 0))
+  then   observed FetchDenied(post=(A, 0), to=B, reason=_) by B
+}
+
+
+scenario "every fetch by a follower is eventually disclosed"
+  kind: liveness
+  requires_in: [Production]
+{
+  actors { A: User, B: User }
+  given  posts == {}
+         follows == { (a, b) -> false | (a, b) in USERS cross USERS }
+         protected == { u -> false | u in USERS }
+         next_seq == { u -> 0 | u in USERS }
+  when   B does follow(A)
+         A does post("hi")
+         B does fetch_post((A, 0))
+  then   eventually observed Disclosed(post=(A, 0), content="hi",
+                                       author=A, to=B) by B
+}

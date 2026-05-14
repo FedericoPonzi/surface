@@ -1,0 +1,62 @@
+module Twitter
+
+"""
+Compose: wire `PostStore` and `FollowGraph` into a single realization
+of `Twitter.surface`.
+
+This file demonstrates v0.6/v0.7 features specific to composition:
+
+  1. `compose <Name> = PartialA + PartialB` — peer substrate composition.
+  2. Cross-substrate channel — `FollowChangedBus` from FollowGraph to
+     PostStore (broadcast to every replicated UserAccount). Demonstrates
+     `from <Component> to <Component>[*]` and `sends ... to <ChannelName>`
+     at the call site.
+  3. Cross-substrate `realizes` overrides — the visibility check for
+     `fetch_post` reads FollowGraph state to STRENGTHEN the substrate-
+     local realizes, deciding between [allow] and [deny] branches.
+  4. v0.7 `by stutter` — the [redundant]/[noop] branches of
+     follow/unfollow/set_protected have no observable effect and are
+     realized as project-wide UNCHANGED.
+"""
+
+compose Production = PostStore + FollowGraph {
+
+  -- Cross-substrate channel: every follow change is broadcast to all
+  -- post-store replicas. Every UserAccount replica has a `receives
+  -- FollowChanged from FollowChangedBus` handler so channel
+  -- completeness (§7.7.2/§7.7.4) is satisfied.
+  channel FollowChangedBus {
+    from FollowGraph.Index to PostStore.UserAccount[*]
+  }
+
+  -- Joint-level fairness for the cross-substrate guards below.
+  fairness weak PostStore.UserAccount[*].disclose
+  fairness weak PostStore.UserAccount[*].deny
+
+  realizes {
+    -- Cross-substrate realizes overrides: gate the [allow]/[deny]
+    -- branches of fetch_post on FollowGraph state. The compose-level
+    -- clause STRENGTHENS the substrate-local realizes (per §7.7.3)
+    -- by adding a guard that reads the *other* substrate's state.
+    surface.fetch_post(pid)[allow] by PostStore.UserAccount[u].disclose
+      when (let post := choose p in PostStore.UserAccount[u].my_posts.
+                          p.id == pid
+            in post.author == param.u
+               || FollowGraph.Index.edges[(param.u, post.author)]
+               || not FollowGraph.Index.prot[post.author])
+
+    surface.fetch_post(pid)[deny] by PostStore.UserAccount[u].deny
+      when (let post := choose p in PostStore.UserAccount[u].my_posts.
+                          p.id == pid
+            in not (post.author == param.u
+                    || FollowGraph.Index.edges[(param.u, post.author)]
+                    || not FollowGraph.Index.prot[post.author]))
+
+    -- v0.7: no-effect branches realized by `by stutter` (§7.7.5),
+    -- which compiles to UNCHANGED Map(...) for both substrates.
+    -- Replaces the v0.6 workaround of an explicit `Index.noop` action.
+    surface.follow(target)[redundant]      by stutter
+    surface.unfollow(target)[noop]         by stutter
+    surface.set_protected(p)[noop]         by stutter
+  }
+}

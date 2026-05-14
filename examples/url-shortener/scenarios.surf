@@ -1,0 +1,45 @@
+module UrlShortener
+
+"""
+Three scenarios that together cover the surface:
+
+1. happy path             — register, then visit, then assert the redirect (safety)
+2. can't squat            — second owner triggers the named SlugTaken failure (safety)
+3. eventually resolves    — after registration, a visit is eventually served  (liveness)
+
+Note: scenario kind: safety is correct for the "can't squat" case.
+Per §8 of the spec, `forbidden` means the trace cannot reach the
+`then` state; a deterministic raised failure is reachable, so the
+correct kind for "this call fails with this named error" is `safety`.
+"""
+
+
+scenario "register then visit" kind: safety {
+  actors { O: Owner, V: Visitor }
+  given  links == {} ; owners == {}
+  when   O does create("go", "https://example.com")
+         V does visit("go")
+  then   resolves("go") == Some("https://example.com")
+         observed Visited(slug="go", target="https://example.com", by=V) by V
+}
+
+
+scenario "creating a taken slug raises SlugTaken" kind: safety {
+  actors { A: Owner, B: Owner }
+  given  links  == { "go": "https://a.example" }
+         owners == { "go": A }
+  when   B does create("go", "https://b.example")
+  then   fails with SlugTaken
+}
+
+
+scenario "every registered slug is eventually visitable"
+  kind: liveness
+  requires_in: [InMemoryStore]
+{
+  actors { O: Owner, V: Visitor }
+  given  links == {} ; owners == {}
+  when   O does create("go", "https://example.com")
+         V does visit("go")
+  then   eventually observed Visited(slug="go", target=_, by=V) by V
+}

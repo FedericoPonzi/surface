@@ -1,0 +1,108 @@
+module UrlShortener
+
+"""
+URL shortener — surface specification.
+
+The user-visible contract: an Owner registers a short slug pointing
+at a URL; a Visitor later visits the slug and is redirected. Slugs
+are unique across all owners.
+
+Deliberately tiny. The goal is end-to-end legibility, not production
+fidelity. There is no expiry, no auth model beyond ownership, no
+rate limiting, and no analytics.
+
+If you want to see partial substrates, compose, replicate, aggregate,
+cross-substrate realizes, or attacker blocks, read `examples/twitter/`
+instead.
+"""
+
+actor Owner    -- registers slugs
+actor Visitor  -- follows slugs
+
+type Slug = String
+type Url  = String
+
+extern OWNERS   : Set[Owner]
+extern VISITORS : Set[Visitor]
+
+const MINUTE : Duration
+
+"""A new short link was registered."""
+event Created(slug: Slug, target: Url, by: Owner)
+
+"""A visitor was redirected to the target URL."""
+event Visited(slug: Slug, target: Url, by: Visitor)
+
+
+surface {
+
+  defaults {
+    auth_channel  : session
+    retention     : transactional
+    rate_limit    : per_actor(100, per=MINUTE)
+    observability : caller_only(Created, Visited)
+    availability  : critical
+    freshness     : strong
+  }
+
+  state {
+    -- The mapping from slug to URL the visitor will be sent to.
+    links  : Map[Slug -> Url]
+    -- Who registered each slug. Used only for the "can't squat" rule.
+    owners : Map[Slug -> Owner]
+  }
+
+  init {
+    links  := {}
+    owners := {}
+  }
+
+  fairness weak visit
+  -- ^ needed for the "eventually resolves" liveness scenario.
+
+  """The current target URL for a slug, or `None` if it isn't registered."""
+  observable resolves(s: Slug) : Optional[Url] =
+    if s in links.keys then Some(links[s]) else None
+
+  """Owner registers a new short link. The slug must be free."""
+  action create(s: Slug, target: Url)
+    by    o: Owner
+    raises { SlugTaken when s in links.keys }
+    idempotency   : idempotent by(s, target, o)
+    -- auth_channel, retention, rate_limit, availability, freshness inherited from defaults
+    observability : caller_only(Created)
+    then  links[s]  := target
+          owners[s] := o
+          emit Created(slug=s, target=target, by=o)
+
+  """Visit a known slug; the visitor is redirected to its target URL.
+     The return value desugars to an implicit Returned<Visit> event
+     for the calling visitor (see 01-language-spec.md §5.1).
+
+     v0.10: visit accepts ANY of three auth channels — open slugs are
+     anonymous; private slugs may carry a capability_url; signed-URL
+     slugs use signed_request. The substrate dispatches by the channel
+     branch (§6.4.1 v0.10 set form)."""
+  action visit(s: Slug) -> Url
+    by    v: Visitor
+    raises { NotFound when s not in links.keys }
+    idempotency   : idempotent
+    auth_channel  : { anonymous, capability_url, signed_request }
+    retention     : ephemeral
+    rate_limit    : per_target(s, 10000, per=MINUTE)
+    observability : caller_only(Visited)
+    -- availability inherited (critical)
+    freshness     : eventual
+    then  emit Visited(slug=s, target=links[s], by=v)
+          return links[s]
+}
+
+
+-- Safety property: every Visited event corresponds to a slug that
+-- was previously Created. (Sanity check: no fabrication.) Uses the
+-- v0.6 `e is X` event-type test and the `events_before` helper.
+property visits_only_known_slugs {
+  always (forall e in events.
+            e is Visited =>
+              exists c in events_before(e). c is Created && c.slug == e.slug)
+}

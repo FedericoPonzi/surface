@@ -1,0 +1,102 @@
+module Twitter
+
+"""
+Control plane substrate — the follow graph and protection flags.
+Owns the social-graph state. A single `Index` component holds both
+the follow edges and the per-user protection flag.
+
+Realises `follow`, `unfollow`, and `set_protected`. The remaining
+surface actions (`post`, `fetch_post`) are `by EXTERNAL` here. The
+no-effect branches (`[redundant]`, `[noop]`) are realised at
+compose level via v0.7's `by stutter` (§7.7.5).
+"""
+
+partial substrate FollowGraph realizes Twitter.surface
+  owns { follows, protected }
+{
+
+  component Index {
+    state {
+      edges : Map[(User, User) -> Bool]
+      prot  : Map[User -> Bool]
+    }
+
+    init {
+      edges := { (a, b) -> false | (a, b) in USERS cross USERS }
+      prot  := { u -> false | u in USERS }
+    }
+
+    """Add a follow edge. Mirrors the surface's [new] branch.
+       Disabled when follower == target so the surface's
+       CantFollowSelf raise (§6.2.1 disable-the-action pattern) is
+       honoured by stuttering on this side."""
+    action add_follow(follower: User, target: User)
+      when not edges[(follower, target)] && follower != target
+      then edges[(follower, target)] := true
+           emit Followed(follower=follower, target=target)
+           sends FollowChanged(follower=follower, target=target,
+                               following=true) to FollowChangedBus
+
+    """Drop a follow edge. Mirrors the surface's [drop] branch."""
+    action drop_follow(follower: User, target: User)
+      when edges[(follower, target)]
+      then edges[(follower, target)] := false
+           emit Unfollowed(follower=follower, target=target)
+           sends FollowChanged(follower=follower, target=target,
+                               following=false) to FollowChangedBus
+
+    """Set the protection flag. Mirrors the surface's [change] branch."""
+    action set_prot(target: User, p: Bool)
+      when prot[target] != p
+      then prot[target] := p
+           emit ProtectionChanged(u=target, protected=p)
+  }
+
+  fairness weak Index.add_follow
+  fairness weak Index.drop_follow
+  fairness weak Index.set_prot
+
+  -- Acknowledge availability dependency on PostStore: the FollowChangedBus
+  -- channel (declared in compose.surf) broadcasts every follow/protect change
+  -- to all replicated UserAccount instances, so FollowGraph cannot deliver
+  -- notifications if PostStore is unavailable. The availability rule
+  -- R-AVAIL-CHANNEL (§15.4) flags this as a required obligation.
+  acknowledged {
+    availability_depends_on : [
+      PostStore                because: "FollowChangedBus broadcasts follow-graph mutations to all PostStore replicas, ensuring that visibility checks in fetch_post have eventually-consistent follow and protection state. If PostStore is unavailable, these notifications cannot be delivered, breaking consistency guarantees."
+    ]
+  }
+
+  authentication {
+    surface_actor of surface.follow         = param.u
+    surface_actor of surface.unfollow       = param.u
+    surface_actor of surface.set_protected  = param.u
+  }
+
+  maps {
+    follows   = Index.edges
+    protected = Index.prot
+  }
+
+  realizes {
+    -- Only the side-effecting branches are realized here. The
+    -- [redundant]/[noop] branches of follow/unfollow/set_protected
+    -- are realized by `by stutter` at compose level (v0.7 §7.7.5),
+    -- which compiles to UNCHANGED Map(...) for both substrates.
+    surface.follow(target)[new] by Index.add_follow
+      when Index.add_follow.follower == param.u
+        && Index.add_follow.target   == target
+
+    surface.unfollow(target)[drop] by Index.drop_follow
+      when Index.drop_follow.follower == param.u
+        && Index.drop_follow.target   == target
+
+    surface.set_protected(p)[change] by Index.set_prot
+      when Index.set_prot.target == param.u
+        && Index.set_prot.p      == p
+  }
+
+  internal {
+    -- (none — every Index action realises a labelled surface branch)
+  }
+}

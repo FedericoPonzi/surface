@@ -1,0 +1,66 @@
+name: Deploy Surface website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - 'docs/**'
+      - '.github/workflows/deploy-site.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build with Genereto
+        id: build
+        uses: FedericoPonzi/genereto/.github/actions/build-site@v0.1.0-ga
+        with:
+          project-path: ./website
+
+      # Rewrite doc-internal .md links to .html, and external repo
+      # paths (../TODO.md, ../examples/) to GitHub blob URLs so they
+      # resolve after the static export.
+      - name: Post-process generated HTML
+        env:
+          REPO_URL_BASE: https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}
+        run: |
+          cd "${{ steps.build.outputs.output-path }}"
+          for f in *.html; do
+            sed -i -E 's|href="([^"]+)\.md"|href="\1.html"|g' "$f"
+            sed -i -E 's|href="([^"#]+)\.md#|href="\1.html#|g' "$f"
+            sed -i -E "s|href=\"\\.\\./TODO\\.html\"|href=\"${REPO_URL_BASE}/TODO.md\"|g" "$f"
+            sed -i -E "s|href=\"\\.\\./examples/\"|href=\"${REPO_URL_BASE}/examples/\"|g" "$f"
+            sed -i -E "s|href=\"\\.\\./examples/([^\"]+)\"|href=\"${REPO_URL_BASE}/examples/\1\"|g" "$f"
+          done
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ steps.build.outputs.output-path }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,63 @@
+module UrlShortener
+
+"""
+A single in-memory substrate for the URL shortener. One component
+(`Store`) holds the slug → URL mapping. Surface actions map 1:1 onto
+store actions. About as simple as a substrate gets.
+"""
+
+substrate InMemoryStore realizes UrlShortener.surface {
+
+  component Store {
+    state {
+      table         : Map[Slug -> Url]
+      registered_by : Map[Slug -> Owner]
+    }
+
+    init {
+      table         := {}
+      registered_by := {}
+    }
+
+    """Register a slug. Mirrors surface.create."""
+    action put(s: Slug, target: Url, o: Owner)
+      when not (s in table.keys)
+      then table[s]         := target
+           registered_by[s] := o
+           emit Created(slug=s, target=target, by=o)
+
+    """Look up a slug for a visitor. Returns the target URL; the
+       implicit Returned<Visit> event is emitted by the surface side
+       per §5.1, so the substrate just produces the Visited event and
+       returns. Refinement is satisfied because the surface action's
+       return-event emit and the substrate's return value match."""
+    action lookup(s: Slug, v: Visitor) -> Url
+      when s in table.keys
+      then emit Visited(slug=s, target=table[s], by=v)
+           return table[s]
+  }
+
+  fairness weak Store.lookup
+
+  authentication {
+    surface_actor of surface.create = param.o
+    surface_actor of surface.visit  = param.v
+  }
+
+  maps {
+    links  = Store.table
+    owners = Store.registered_by
+  }
+
+  realizes {
+    surface.create(s, target) by Store.put
+      when Store.put.s == s && Store.put.target == target
+
+    surface.visit(s) by Store.lookup
+      when Store.lookup.s == s
+  }
+
+  internal {
+    -- (none — both Store actions realize a surface action)
+  }
+}

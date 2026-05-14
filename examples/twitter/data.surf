@@ -1,0 +1,107 @@
+module Twitter
+
+"""
+Data plane substrate — the post store. Owns the post log and per-user
+post counters. One `UserAccount` component per user, replicated.
+
+Realises only the post-related surface actions. The visibility check
+that gates `fetch_post` lives in compose.surf as a cross-substrate
+realizes override that consults FollowGraph. Other surface actions
+(`follow`, `unfollow`, `set_protected`) are `by EXTERNAL` here.
+"""
+
+partial substrate PostStore realizes Twitter.surface
+  owns { posts, next_seq }
+{
+
+  replicate UserAccount[u: User in USERS] {
+    state {
+      my_posts : Set[{id: PostId, author: User, content: Content}]
+      my_seq   : Nat
+    }
+
+    init {
+      my_posts := {}
+      my_seq   := 0
+    }
+
+    """Append a post to this user's wall. The id is (u, my_seq) which
+       guarantees uniqueness across replicas. Returns the PostId; the
+       implicit Returned<Post> event is per §5.1."""
+    action publish(actor_user: User, content: Content) -> PostId
+      when actor_user == u   -- only the matching account publishes for u
+      then let id := (u, my_seq)
+           my_posts := my_posts union {{id: id, author: u, content: content}}
+           my_seq   += 1
+           emit Posted(id=id, author=u, content=content)
+           return id
+
+    """Disclose a post to a requester. The compose-level realizes
+       override decides when this fires (vs `deny`)."""
+    action disclose(pid: PostId, requester: User) -> Optional[Content]
+      when exists p in my_posts. p.id == pid
+      then let post := choose p in my_posts. p.id == pid
+           emit Disclosed(post=pid, content=post.content,
+                          author=u, to=requester)
+           return Some(post.content)
+
+    """Refuse a fetch. Same compose-level decision."""
+    action deny(pid: PostId, requester: User) -> Optional[Content]
+      when exists p in my_posts. p.id == pid
+      then emit FetchDenied(post=pid, to=requester,
+                            reason="protected, not follower")
+           return None
+
+    """Receive follow-graph change notifications. No-op in this simple
+       data plane; declared so the cross-substrate channel
+       FollowChangedBus has a matching `receives` per §7.7.2's
+       channel-completeness rule."""
+    receives FollowChanged(follower: User, target: User, following: Bool)
+      from FollowChangedBus
+      then  -- intentionally no state change here.
+  }
+
+  fairness weak UserAccount[*].disclose
+  fairness weak UserAccount[*].deny
+
+  authentication {
+    surface_actor of surface.post       = param.u
+    surface_actor of surface.fetch_post = param.u
+  }
+
+  maps {
+    -- Headline aggregate use: the surface's flat post set is the
+    -- union of every account's local posts. Value type is a Set, so
+    -- `using union_set` (v0.7, renamed from v0.6 `using union`) is
+    -- type-correct.
+    posts = aggregate UserAccount[u].my_posts using union_set
+
+    -- Per-user counter mapping: a map comprehension over the replica
+    -- ids, no aggregation needed.
+    next_seq = { u -> UserAccount[u].my_seq | u in USERS }
+  }
+
+  realizes {
+    surface.post(content) by UserAccount[u].publish
+      when UserAccount[u].publish.actor_user == param.u
+        && UserAccount[u].publish.content    == content
+
+    -- The substrate-local realizes ties the labelled surface branch to
+    -- a specific concrete action; the compose-level realizes (in
+    -- compose.surf) STRENGTHENS each clause with the cross-substrate
+    -- guard that reads FollowGraph.
+    surface.fetch_post(pid)[allow] by UserAccount[u].disclose
+      when UserAccount[u].disclose.pid       == pid
+        && UserAccount[u].disclose.requester == param.u
+
+    surface.fetch_post(pid)[deny] by UserAccount[u].deny
+      when UserAccount[u].deny.pid       == pid
+        && UserAccount[u].deny.requester == param.u
+  }
+
+  internal {
+    -- The receives handler for FollowChangedBus is internal — it
+    -- has no observable effect at the surface.
+    UserAccount[*].receives.FollowChanged
+  }
+}
