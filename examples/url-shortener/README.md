@@ -17,7 +17,7 @@ read `examples/twitter/` instead.
 | `scenarios.surf` | `UrlShortener`  | Three scenarios: happy path (safety), can't-squat (forbidden), eventually (liveness) |
 
 All three files declare `module UrlShortener` at the top — read
-`../docs/language-spec.md` §2.1 for the multi-file module rules.
+`../website/content/blog/language-spec.md` §2.1 for the multi-file module rules.
 
 ## What this models
 

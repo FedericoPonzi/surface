@@ -15,6 +15,7 @@ show_table_of_contents: false
   <div class="cta">
     <a class="btn btn-primary" href="overview.html">Start with the overview</a>
     <a class="btn btn-secondary" href="language-spec.html">Read the spec</a>
+    <a class="btn btn-secondary" href="surfacide.html">Get the toolchain</a>
   </div>
 </section>
 
@@ -76,6 +77,26 @@ substrate SqlMonolith realizes surface {
 | **Use cases** | `scenario` blocks render to Markdown and are mechanically checked for reachability. |
 
 </div>
+
+<h2 class="section-heading">The toolchain</h2>
+
+<section class="card-grid">
+  <div class="card">
+    <h3>Surfacide</h3>
+    <p>Rust frontend toolchain — parser, slot pass, obligation pass, docs emit. Single binary, miette-style diagnostics with stable error codes. The compiler talks back so the "what did I forget?" question becomes mechanical.</p>
+    <a href="surfacide.html">Read the Surfacide guide →</a>
+  </div>
+  <div class="card">
+    <h3>Stable diagnostic codes</h3>
+    <p>Every error and warning carries a stable code (<code>E_SURFACE_SLOT_MISSING</code>, <code>W_WRITE_CONFLICT</code>, …). Asserted in golden tests. CI-friendly. Searchable.</p>
+    <a href="surfacide.html#error--warning-codes">See the catalogue →</a>
+  </div>
+  <div class="card">
+    <h3>Edit-check loop</h3>
+    <p>Run <code>surfacide check .</code> in a terminal next to your editor. The slot pass tells you which of seven mandatory boundaries you've left blank; the obligation pass tells you which cross-cutting consequences need an explicit decision.</p>
+    <a href="surfacide.html#authoring-a-spec-with-the-checker-in-the-loop">Authoring workflow →</a>
+  </div>
+</section>
 
 <p style="text-align:center; color: var(--muted); margin-top: 32px;">
   Surface is <strong>experimental</strong>. The language has been shaped by 8 rounds of agent-authored

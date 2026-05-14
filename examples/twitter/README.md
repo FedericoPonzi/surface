@@ -21,7 +21,7 @@ first — that example is deliberately tiny.
 | `scenarios.surf` | `Twitter`  | Four scenarios across `safety` / `liveness`                                       |
 
 All files declare `module Twitter` at the top — read
-`../docs/language-spec.md` §2.1 for multi-file module rules.
+`../website/content/blog/language-spec.md` §2.1 for multi-file module rules.
 
 ## What this models
 

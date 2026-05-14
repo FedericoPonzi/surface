@@ -29,7 +29,7 @@ substrate SqlMonolith realizes surface {
 
 ## Start here
 
-- **[`docs/overview.md`](docs/overview.md)** — the pitch, design principles,
+- **[`website/content/blog/overview.md`](website/content/blog/overview.md)** — the pitch, design principles,
   what a `.surf` file produces.
 - **[`examples/url-shortener/`](examples/url-shortener/)** — minimal idiomatic spec.
 - **[`examples/twitter/`](examples/twitter/)** — multi-substrate Production compose.
@@ -38,15 +38,15 @@ substrate SqlMonolith realizes surface {
 
 ## Reference
 
-- **[`docs/language-spec.md`](docs/language-spec.md)** — normative spec.
-- **[`docs/modules.md`](docs/modules.md)** — modules & "zoom" composition.
-- **[`docs/coverage.md`](docs/coverage.md)** — what Surface covers and what it deliberately doesn't (v0.10.1).
+- **[`website/content/blog/language-spec.md`](website/content/blog/language-spec.md)** — normative spec.
+- **[`website/content/blog/modules.md`](website/content/blog/modules.md)** — modules & "zoom" composition.
+- **[`website/content/blog/coverage.md`](website/content/blog/coverage.md)** — what Surface covers and what it deliberately doesn't (v0.10.1).
 
 ## History & status
 
 Status: **draft v0.10.1**. The language has been shaped by 8 rounds of
 agent-authored specs + folded feedback.
 
-- [`docs/changelog.md`](docs/changelog.md) — per-version history.
+- [`website/content/blog/changelog.md`](website/content/blog/changelog.md) — per-version history.
 - [`docs/reviews/`](docs/reviews/) — staff PL + tool self-reviews.
 - [`TODO.md`](TODO.md) — open backlog.

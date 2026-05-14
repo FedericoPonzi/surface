@@ -38,8 +38,15 @@ for f in *.html; do
 done
 
 # (2) Rewrite repo-relative paths that escape the site into the repo browser.
-# These come from the canonical docs/*.md files (e.g. ../TODO.md, ../examples/).
+# These come from the canonical source markdown (e.g. ../../../TODO.md,
+# ../../../examples/), now that the doc sources live at
+# website/content/blog/*.md.
 for f in *.html; do
+  sed -i -E "s|href=\"\.\./\.\./\.\./TODO\.html\"|href=\"${REPO_URL_BASE}/TODO.md\"|g" "$f"
+  sed -i -E "s|href=\"\.\./\.\./\.\./TODO\.md\"|href=\"${REPO_URL_BASE}/TODO.md\"|g" "$f"
+  sed -i -E "s|href=\"\.\./\.\./\.\./examples/\"|href=\"${REPO_URL_BASE}/examples/\"|g" "$f"
+  sed -i -E "s|href=\"\.\./\.\./\.\./examples/([^\"]+)\"|href=\"${REPO_URL_BASE}/examples/\1\"|g" "$f"
+  # Legacy (older docs/-relative paths, kept defensively):
   sed -i -E "s|href=\"\.\./TODO\.html\"|href=\"${REPO_URL_BASE}/TODO.md\"|g" "$f"
   sed -i -E "s|href=\"\.\./examples/\"|href=\"${REPO_URL_BASE}/examples/\"|g" "$f"
   sed -i -E "s|href=\"\.\./examples/([^\"]+)\"|href=\"${REPO_URL_BASE}/examples/\1\"|g" "$f"

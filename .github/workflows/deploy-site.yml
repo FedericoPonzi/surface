@@ -41,9 +41,10 @@ jobs:
           for f in *.html; do
             sed -i -E 's|href="([^"]+)\.md"|href="\1.html"|g' "$f"
             sed -i -E 's|href="([^"#]+)\.md#|href="\1.html#|g' "$f"
-            sed -i -E "s|href=\"\\.\\./TODO\\.html\"|href=\"${REPO_URL_BASE}/TODO.md\"|g" "$f"
-            sed -i -E "s|href=\"\\.\\./examples/\"|href=\"${REPO_URL_BASE}/examples/\"|g" "$f"
-            sed -i -E "s|href=\"\\.\\./examples/([^\"]+)\"|href=\"${REPO_URL_BASE}/examples/\1\"|g" "$f"
+            sed -i -E "s|href=\"\\.\\./\\.\\./\\.\\./TODO\\.html\"|href=\"${REPO_URL_BASE}/TODO.md\"|g" "$f"
+            sed -i -E "s|href=\"\\.\\./\\.\\./\\.\\./TODO\\.md\"|href=\"${REPO_URL_BASE}/TODO.md\"|g" "$f"
+            sed -i -E "s|href=\"\\.\\./\\.\\./\\.\\./examples/\"|href=\"${REPO_URL_BASE}/examples/\"|g" "$f"
+            sed -i -E "s|href=\"\\.\\./\\.\\./\\.\\./examples/([^\"]+)\"|href=\"${REPO_URL_BASE}/examples/\1\"|g" "$f"
           done
 
       - name: Setup Pages

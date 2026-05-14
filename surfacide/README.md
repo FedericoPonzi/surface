@@ -2,7 +2,7 @@
 
 A Rust frontend toolchain for the **Surface** specification language.
 
-Surface (see `../docs/language-spec.md` at the repo root) is a refinement-based
+Surface (see `../website/content/blog/language-spec.md` at the repo root) is a refinement-based
 DSL for describing system *boundaries*: what's promised, what's allowed,
 and what's deliberately undefined. Surfacide is the checker that turns
 those promises into mechanical diagnostics — the goal is that a reviewer

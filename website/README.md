@@ -9,9 +9,9 @@ website/
   content/
     index.md                      Landing page (hero + cards)
     blog/
-      overview.md   → ../docs/overview.md     (symlink)
-      language-spec.md  → …                   (symlink)
-      modules.md, coverage.md, changelog.md   (symlinks)
+      overview.md, language-spec.md, modules.md,
+      coverage.md, changelog.md, surfacide.md
+                                  Documentation pages (canonical sources)
   templates/
     surface/
       index.html                  Landing template (full-width)
@@ -21,10 +21,10 @@ website/
   build.sh                        Wraps genereto + rewrites .md→.html links
 ```
 
-The doc pages are **symlinks** back to `../docs/*.md`. That keeps the
-markdown source canonical in `docs/` and means the site never drifts.
-Each `docs/*.md` carries a small YAML frontmatter block at the top
-(title, description, ToC flag) that Genereto consumes.
+Each `content/blog/*.md` carries a small YAML frontmatter block
+(title, description, ToC flag) that Genereto consumes. These files
+are the canonical markdown source for the language docs — there is
+no `docs/` mirror.
 
 ## Build locally
 
@@ -67,8 +67,8 @@ python3 -m http.server -d output 8000
 - **Landing page**: edit `content/index.md`. Frontmatter and embedded
   HTML / markdown are intentional — the cards + hero are styled by
   classes in `res/styles.css`.
-- **Doc pages**: edit the canonical files in `../docs/*.md`. Symlinks
-  pick up the change automatically.
+- **Doc pages**: edit `content/blog/*.md` directly (they're the
+  canonical markdown source).
 - **Styling**: edit `templates/surface/res/styles.css`. The blue
   palette lives in CSS variables at the top.
 
